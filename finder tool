@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>False Indigo Tracker</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { font-family: -apple-system, sans-serif; margin: 0; padding: 10px; background: #fff; }
+        /* We set a specific height for the map so the buttons have room below it */
+        #map { height: 250px; border-radius: 12px; margin-bottom: 15px; border: 2px solid #e0e0e0; }
+        .controls { background: #f9f9f9; padding: 15px; border-radius: 12px; border: 1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        h3 { margin-top: 0; color: #2d4a22; font-size: 1.2rem; }
+        button { background: #2e7d32; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; width: 100%; font-weight: bold; font-size: 1rem; }
+        button:disabled { background: #a5d6a7; }
+        input { width: 100%; box-sizing: border-box; margin: 10px 0; padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; /* 16px prevents iOS zoom on focus */ }
+        #status { font-size: 0.85rem; margin-top: 10px; color: #666; text-align: center; }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <h3>Found False Indigo?</h3>
+        <input type="text" id="notes" placeholder="Note: e.g. Near the trailhead">
+        <button id="submitBtn">📍 Log My Current Location</button>
+        <p id="status">Ready to track</p>
+    </div>
+
+    <div id="map" style="margin-top:15px;"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // 1. REPLACE THIS WITH YOUR WEB APP URL
+        const SCRIPT_URL = 'PASTE_YOUR_URL_HERE';
+        
+        // 2. Centering on Boise, Idaho
+        const map = L.map('map').setView([43.6150, -116.2023], 12); 
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        const submitBtn = document.getElementById('submitBtn');
+        const status = document.getElementById('status');
+
+        submitBtn.onclick = () => {
+            if (!navigator.geolocation) {
+                status.innerText = "Error: GPS not supported.";
+                return;
+            }
+
+            submitBtn.disabled = true;
+            status.innerText = "🛰️ Finding your GPS coordinates...";
+
+            navigator.geolocation.getCurrentPosition((pos) => {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                const notes = document.getElementById('notes').value;
+
+                status.innerText = "Saving to Google Sheet...";
+
+                fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify({ lat, lng, notes })
+                }).then(() => {
+                    status.innerText = "✅ Successfully saved!";
+                    L.marker([lat, lng]).addTo(map)
+                        .bindPopup("<b>Success!</b><br>" + (notes || "False Indigo found here"))
+                        .openPopup();
+                    map.setView([lat, lng], 15); // Zoom in on their new point
+                    document.getElementById('notes').value = "";
+                    submitBtn.disabled = false;
+                }).catch(err => {
+                    status.innerText = "❌ Error saving to sheet.";
+                    submitBtn.disabled = false;
+                });
+
+            }, (err) => {
+                status.innerText = "❌ GPS Error: " + err.message;
+                submitBtn.disabled = false;
+            }, { enableHighAccuracy: true });
+        };
+    </script>
+</body>
+</html>
